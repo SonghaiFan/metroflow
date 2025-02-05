@@ -1,163 +1,221 @@
-require("paper");
-var util = require("./util.js");
+import paper from "paper";
+import { DisplaySettings, Observer } from "./util";
 
+let currentMap = null;
 
-var map = null;
-
-function setCurrentMap(currentMap) {
-    map = currentMap;
+export function setCurrentMap(map) {
+  currentMap = map;
 }
 
-function showStationContextMenu(stationId) {
-    $('#' + stationId).contextMenu();
-}
+// Mouse event handlers
+export function handleMouseDown(event) {
+  if (!currentMap) return;
 
+  // Get clicked elements
+  const hitResult = paper.project.hitTest(event.point, {
+    segments: true,
+    stroke: true,
+    fill: true,
+    tolerance: 5,
+  });
 
-function showStationInfo(station) {
-    var $div = $('<div class="station-info">id:' + station.id + '</div>');
-    $div.css('top', $('#' + station.id).css("top"));
-    $div.css('left', $('#' + station.id).css("left"));
-    $('#overlay-content').append($div);
-}
+  if (hitResult) {
+    const path = hitResult.item;
 
-
-function hideStationInfoAll() {
-    $(".station-info").hide();
-}
-
-
-function showSegmentContextMenu(segmentId, position) {
-    $('#segment-' + segmentId).data('position', position);
-    $('#segment-' + segmentId).contextMenu();
-}
-
-
-function createStationMinorElement(station, track) {
-	$("#overlay").append("<div class=\"station\" id=\"" + station.id + "\" data-station-id=\"" + station.id + "\"></div>")
-}
-
-
-function createMapElements(map, onRemoveStation) {
-    $("#overlay").empty();
-    var mapElements = [];
-    for (var i in map.tracks) {
-        var trackElements = createTrackElements(map.tracks[i], onRemoveStation);
-        mapElements.push({track: map.tracks[i], stationElements: trackElements.stationElements, segmentElements: trackElements.segmentElements});
-    }
-    return mapElements
-}
-
-
-function createTrackElements(track) {
-    var stationElements = [];
-    for (var i in track.stations) {
-        var stationElement = createStationElement(track.stations[i], track);
-        stationElements.push(stationElement);
-    }
-    var segmentElements = createSegmentElements(track);
-    return {stationElements: stationElements, segmentElements: segmentElements};
-}
-
-
-function createStationElement(station, track) {
-	$("#overlay").append("<div class=\"station\" id=\"" + station.id + "\" data-station-id=\"" + station.id + "\"></div>")
-    var stationElement = $("#" + station.id);
-
-    updateElementPosition(stationElement, station);
-    updateStyle();
-    createStationObserver();
-
-    function updateElementPosition(stationElement, station) {
-        var viewPosition = paper.view.projectToView(station.position);
-	    stationElement.css('top', (viewPosition.y - stationElement.width()/2) + 'px');
-	    stationElement.css('left', (viewPosition.x - stationElement.height()/2) + 'px');
+    // Find corresponding station or segment
+    const { station, track } = currentMap.findStationByPathId(path.id);
+    if (station) {
+      // Handle station click
+      station.toggleSelect();
+      // Only show context menu in select mode
+      if (station.isSelected && window.currentToolMode === "select") {
+        showStationContextMenu(station.id);
+      }
+      paper.view.update();
+      return;
     }
 
-    function updateStyle() {
-        if (util.DisplaySettings.isDebug) {
-            stationElement.css('border-width', '1px');
-        } else {
-            stationElement.css('border-width', '0px');
-        }
+    const { segment } = currentMap.findSegmentByPathId(path.id);
+    if (segment) {
+      // Handle segment click
+      segment.toggleSelect();
+      // Only show context menu in select mode
+      if (segment.isSelected && window.currentToolMode === "select") {
+        showSegmentContextMenu(segment.id, event.point);
+      }
+      paper.view.update();
+      return;
     }
-
-    function createStationObserver() {
-        var stationObserver = new util.Observer(
-            function(station) {
-                updateElementPosition(this.stationElement, station);
-            },
-            function(station) {
-                this.stationElement.remove();
-            }
-        );
-        stationObserver.stationElement = stationElement;
-        station.registerObserver(stationObserver);
-    }
-    return stationElement;
+  }
 }
 
+export function handleMouseDrag(event) {
+  if (!currentMap) return;
 
-function createSegmentElements(track) {
-    console.log('createSegmentElements');
-    $(".segment").empty();
-    var elements = [];
-    for (var i in track.segments) {
-        var segment = track.segments[i];
-        var element = createSegmentElement(segment, track);
-        elements.push(element);
+  // Get dragged elements
+  const hitResult = paper.project.hitTest(event.point, {
+    segments: true,
+    stroke: true,
+    fill: true,
+    tolerance: 5,
+  });
+
+  if (hitResult) {
+    const path = hitResult.item;
+    const { station } = currentMap.findStationByPathId(path.id);
+    if (station && station.isSelected) {
+      // Move selected station
+      station.position = event.point;
+      paper.view.update();
     }
-    return elements;
+  }
 }
 
+export function handleMouseUp(event) {
+  if (!currentMap) return;
 
-function createSegmentElement(segment, track) {
-	var segmentElementId = "segment-" + segment.id;
-	$("#overlay").append("<div class=\"segment\" id=\"" + segmentElementId + "\" data-segment-id=\"" + segment.id + "\"></div>")
-    var segmentElement = $("#" + segmentElementId);
+  // Deselect all elements when clicking empty space
+  const hitResult = paper.project.hitTest(event.point, {
+    segments: true,
+    stroke: true,
+    fill: true,
+    tolerance: 5,
+  });
 
-    updateSegmentElementPosition(segmentElement, segment);
-    updateStyle();
-    createSegmentObserver();
-
-    function updateSegmentElementPosition(segmentElement, segment) {
-        var segmentCenterView = paper.view.projectToView(segment.center());
-	    segmentElement.css('top', (segmentCenterView.y - segmentElement.width()/2) + 'px');
-	    segmentElement.css('left', (segmentCenterView.x - segmentElement.height()/2) + 'px');
-    }
-
-    function updateStyle() {
-        if (util.DisplaySettings.isDebug) {
-            segmentElement.css('border-width', '1px');
-        } else {
-            segmentElement.css('border-width', '0px');
-        }
-    }
-
-    function createSegmentObserver() {
-        var segmentObserver = new util.Observer(
-            function(segment) {
-                updateSegmentElementPosition(this.segmentElement, segment);
-            },
-            function(segment) {
-                this.segmentElement.remove();
-            }
-        );
-        segmentObserver.segmentElement = segmentElement;
-        segment.registerObserver(segmentObserver);
-    }
-
-    return segmentElement;
+  if (!hitResult) {
+    currentMap.tracks.forEach((track) => {
+      track.stations.forEach((station) => station.deselect());
+      track.segments.forEach((segment) => segment.deselect());
+    });
+    paper.view.update();
+  }
 }
 
+export function showStationContextMenu(stationId) {
+  $(`#${stationId}`).contextMenu();
+}
 
-module.exports = {
-    createMapElements: createMapElements,
-    createTrackElements: createTrackElements,
-    createStationElement: createStationElement,
-    showStationInfo: showStationInfo,
-    hideStationInfoAll: hideStationInfoAll,
-    showStationContextMenu: showStationContextMenu,
-    showSegmentContextMenu: showSegmentContextMenu,
-    createSegmentElements: createSegmentElements,
-    setCurrentMap: setCurrentMap,
-};
+export function showStationInfo(station) {
+  const $div = $(`<div class="station-info">id:${station.id}</div>`);
+  $div.css("top", $(`#${station.id}`).css("top"));
+  $div.css("left", $(`#${station.id}`).css("left"));
+  $("#overlay-content").append($div);
+}
+
+export function hideStationInfoAll() {
+  $(".station-info").hide();
+}
+
+export function showSegmentContextMenu(segmentId, position) {
+  $(`#segment-${segmentId}`).data("position", position).contextMenu();
+}
+
+export function createStationMinorElement(station, track) {
+  $("#overlay").append(
+    `<div class="station" id="${station.id}" data-station-id="${station.id}"></div>`
+  );
+}
+
+export function createMapElements(map, onRemoveStation) {
+  $("#overlay").empty();
+  return map.tracks.map((track) => {
+    const trackElements = createTrackElements(track, onRemoveStation);
+    return {
+      track,
+      stationElements: trackElements.stationElements,
+      segmentElements: trackElements.segmentElements,
+    };
+  });
+}
+
+export function createTrackElements(track) {
+  const stationElements = track.stations.map((station) =>
+    createStationElement(station, track)
+  );
+  const segmentElements = createSegmentElements(track);
+
+  return { stationElements, segmentElements };
+}
+
+export function createStationElement(station, track) {
+  $("#overlay").append(
+    `<div class="station" id="${station.id}" data-station-id="${station.id}"></div>`
+  );
+  const stationElement = $(`#${station.id}`);
+
+  function updateElementPosition(stationElement, station) {
+    const viewPosition = paper.view.projectToView(station.position);
+    stationElement.css({
+      top: `${viewPosition.y - stationElement.width() / 2}px`,
+      left: `${viewPosition.x - stationElement.height() / 2}px`,
+    });
+  }
+
+  function updateStyle() {
+    stationElement.css("border-width", DisplaySettings.isDebug ? "1px" : "0px");
+  }
+
+  function createStationObserver() {
+    const stationObserver = new Observer(
+      function (station) {
+        updateElementPosition(this.stationElement, station);
+      },
+      function (station) {
+        this.stationElement.remove();
+      }
+    );
+    stationObserver.stationElement = stationElement;
+    station.registerObserver(stationObserver);
+  }
+
+  updateElementPosition(stationElement, station);
+  updateStyle();
+  createStationObserver();
+
+  return stationElement;
+}
+
+export function createSegmentElements(track) {
+  console.log("createSegmentElements");
+  $(".segment").empty();
+  return track.segments.map((segment) => createSegmentElement(segment, track));
+}
+
+export function createSegmentElement(segment, track) {
+  const segmentElementId = `segment-${segment.id}`;
+  $("#overlay").append(
+    `<div class="segment" id="${segmentElementId}" data-segment-id="${segment.id}"></div>`
+  );
+  const segmentElement = $(`#${segmentElementId}`);
+
+  function updateSegmentElementPosition(segmentElement, segment) {
+    const segmentCenterView = paper.view.projectToView(segment.center());
+    segmentElement.css({
+      top: `${segmentCenterView.y - segmentElement.width() / 2}px`,
+      left: `${segmentCenterView.x - segmentElement.height() / 2}px`,
+    });
+  }
+
+  function updateStyle() {
+    segmentElement.css("border-width", DisplaySettings.isDebug ? "1px" : "0px");
+  }
+
+  function createSegmentObserver() {
+    const segmentObserver = new Observer(
+      function (segment) {
+        updateSegmentElementPosition(this.segmentElement, segment);
+      },
+      function (segment) {
+        this.segmentElement.remove();
+      }
+    );
+    segmentObserver.segmentElement = segmentElement;
+    segment.registerObserver(segmentObserver);
+  }
+
+  updateSegmentElementPosition(segmentElement, segment);
+  updateStyle();
+  createSegmentObserver();
+
+  return segmentElement;
+}

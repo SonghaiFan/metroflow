@@ -1,358 +1,293 @@
-require("paper");
-var util = require("./util.js");
-var metrosegment = require("./segment.js");
-var metrostation = require("./station.js");
-var metrostyles = require("./styles.js");
+import paper from "paper";
+import { v4 as uuidv4 } from "uuid";
+import { Observable } from "./util";
+import { Segment } from "./segment";
+import { Station, StationMinor } from "./station";
+import { Styles } from "./styles";
 
+export class Track {
+  constructor() {
+    this.segments = [];
+    this.id = uuidv4();
+    this.stations = [];
+    this.stationsMajor = [];
+    this.stationsMinor = [];
+    this.segmentStyle = Styles.createSegmentStyle();
+    this.stationStyle = Styles.createStationStyle();
+    this.stationMinorStyle = Styles.createStationMinorStyle();
+    this.stationMinorStyle.strokeColor = this.segmentStyle.strokeColor;
+  }
 
-var Track = {
-    Track: function() {
-        this.segments = [];
-        this.id = util.uuidv4();
-        this.stations = [];
-        this.stationsMajor = [];
-        this.stationsMinor = [];
-        this.segmentStyle = metrostyles.createSegmentStyle();
-        this.stationStyle = metrostyles.createStationStyle();
-        this.stationMinorStyle = metrostyles.createStationMinorStyle();
-        this.stationMinorStyle.strokeColor = this.segmentStyle.strokeColor;
-        return this;
-    },
-    setStationRadius: function(radius) {
-        this.stationStyle.stationRadius = radius;
-    },
-    setStationStrokeWidth: function(strokeWidth) {
-        this.stationStyle.strokeWidth = strokeWidth;
-    },
-    setSegmentStyle: function(style) {
-        this.segmentStyle = style;
-        this.stationMinorStyle.strokeWidth = this.segmentStyle.strokeWidth;
-        this.stationMinorStyle.strokeColor = this.segmentStyle.strokeColor;
-        this.stationMinorStyle.minorStationSize = this.segmentStyle.strokeWidth * 2.0;
-    },
-    setStationStyle: function(style) {
-        this.stationStyle = style;
-    },
-    createStationFree: function(position, previousStation) {
-        var station = metrostation.createStationFree(position, this.stationStyle);
-        if (previousStation) {
-            this.createSegment(previousStation, station)
-        }
-        this.stations.push(station);
-        this.stationsMajor.push(station);
-        console.log('create station', station.id);
-        this.notifyAllObservers();
-        return station;
-    },
-    createStationOnSegment: function(segment, offsetFactor) {
-        var station = metrostation.createStationSegment(offsetFactor, this.stationStyle);
-        this.stations.push(station);
-        this.stationsMajor.push(station);
-        segment.addStationUser(station);
-        this.notifyAllObservers();
-        return station;
-    },
-    createSegment: function(stationA, stationB) {
-        console.log('track.createSegment', stationA.id, stationB.id);
-        var segment = metrosegment.createSegment(stationA, stationB, this.segmentStyle);
-        this.segments.push(segment);
-        this.notifyAllObservers();
-        return segment;
-    },
-    createStationMinorOnSegmentId: function(position, segmentId) {
-        var segment = this.findSegment(segmentId);
-        position = segment.path.getNearestPoint(position);
-        return this.createStationMinor(position, segment);
-    },
-    createStationMinor: function(position, segment) {
-        var station = metrostation.createStationMinor(position, segment.stationA, segment.stationB, this.stationMinorStyle);
-        segment.addStationAuto(station);
-        station.setPosition(position, segment);
-        this.stations.push(station);
-        this.stationsMinor.push(station);
-        this.notifyAllObservers();
-        return station;
-    },
-    segmentToStation: function(station) {
-        for (var i in this.segments) {
-            var segment = this.segments[i];
-            if (segment.stationB.id === station.id) {
-                return segment;
-            }
-        }
-        return null;
-    },
-    segmentFromStation: function(station) {
-        for (var i in this.segments) {
-            var segment = this.segments[i];
-            if (segment.stationA.id === station.id) {
-                return segment;
-            }
-        }
-        return null;
-    },
-    lastAddedStation: function() {
-        if (this.stationsMajor.length === 0) {
-            return null;
-        }
-        return this.stationsMajor[this.stationsMajor.length - 1];
-    },
-    connectedStations: function(station) {
-        var stations = [];
-        for (var i in this.segments) {
-            var segment = this.segments[i];
-            if (station.id === segment.stationA.id) {
-                stations.push(segment.stationB);
-            }
-            if (station.id === segment.stationB.id) {
-                stations.push(segment.stationA);
-            }
-        }
-        return stations;
-    },
-    allPaths: function() {
-        var paths = [];
-        for (var i in this.segments) {
-            paths.push(this.segments[i].path);
-        }
-        return paths;
-    },
-    draw: function(drawSettings) {
-        // console.log('track.draw()');
-        for (var i in this.segments) {
-            var segment = this.segments[i];
-            var previous = this.segmentToStation(segment.stationA);
-            segment.draw(previous, drawSettings);
-        }
-        for (var i in this.stationsMinor) {
-            var stationMinor = this.stationsMinor[i];
-            var segment = this.findSegmentForStationMinor(stationMinor);
-            this.stationsMinor[i].draw(segment);
-        }
-        for (var i in this.stationsMajor) {
-            this.stationsMajor[i].draw();
-        }
-        // this.notifyAllObservers(this);
-    },
-    createText: function(station, positionRelative) {
-        var text = new PointText(station.position + positionRelative);
-        text.justification = 'left';
-        text.fillColor = 'black';
-        text.content = station.name;
-        return text;
-    },
-    preventIntersectionSegments: function(text, station, paths, positions) {
-        if (!paths) {
-            return positions[0];
-        }
-        var positionsTried = 0;
-        var intersects = true;
-        while (intersects && positionsTried < positions.length) {
-            intersects = false;
-            for (var j in paths) {
-                if (positionsTried >= positions.length-1) {
-                    break;
-                }
-                var path = paths[j];
-                intersects = text.intersects(path);
-                if (intersects) {
-                    var textOld = text;
-                    positionsTried++;
-                    text = this.createText(station, positions[positionsTried]);
-                    text.fontSize = textOld.fontSize;
-                    textOld.remove();
-                    break;
-                }
-            }
-        }
-        return positions[positionsTried];
-    },
-    drawStationNames: function(paths, drawSettings) {
-        var fontSize = 14;
-        this.drawMajorStationNames(paths, fontSize, drawSettings.calcTextPositions);
-        fontSize = 10;
-        if (drawSettings.minorStationText) {
-            this.drawMinorStationNames(fontSize);
-        }
-    },
-    drawMajorStationNames: function(paths, fontSize, calcTextPositions) {
-        for (var i in this.stationsMajor) {
-            var station = this.stationsMajor[i];
-            if (!calcTextPositions && station.textPositionRel) {
-                text = this.createText(station, station.textPositionRel);
-                text.fontSize = fontSize;
-                continue;
-            }
-            var stationRadius = station.style.stationRadius + station.style.strokeWidth;
-            var defaultPosition = new Point(stationRadius, fontSize / 4.0)
-            var text = this.createText(station, defaultPosition);
-            text.fontSize = fontSize;
-            if (!calcTextPositions) {
-                continue;
-            } else {
-                console.log('recalc best text position');
-                var positions = [];
-                positions.push(defaultPosition);
-                positions.push(new Point(-stationRadius - text.bounds.width, fontSize / 4.0));
-                positions.push(new Point(0, -stationRadius * 1.2));
-                positions.push(new Point(stationRadius, -stationRadius * 0.8));
-                positions.push(new Point(-text.bounds.width, -stationRadius * 1.2));
-                positions.push(new Point(-text.bounds.width-stationRadius, -stationRadius * 0.8));
-                positions.push(new Point(0, stationRadius * 2.2));
-                positions.push(new Point(stationRadius, stationRadius * 1.4));
-                positions.push(new Point(-text.bounds.width, stationRadius * 2.2));
-                positions.push(new Point(-text.bounds.width-stationRadius, stationRadius * 1.2));
-                var pathsToUse = paths;
-                if (paths.length === 0) {
-                    pathsToUse = this.stationSegmentPaths(station);
-                }
-                station.textPositionRel = this.preventIntersectionSegments(text, station, pathsToUse, positions);
-            }
-        }
-    },
-    stationSegmentPaths: function(station) {
-        var segmentTo = this.segmentToStation(station);
-        var segmentFrom = this.segmentFromStation(station);
-        var segments = [];
-        if (segmentTo) {
-            segments.push(segmentTo);
-        }
-        if (segmentFrom) {
-            segments.push(segmentFrom);
-        }
-        var pathsLocal = [];
-        for (var i in segments) {
-            for (var j in segments[i].paths) {
-                pathsLocal.push(segments[i].paths[j]);
-            }
-        }
-        return pathsLocal;
-    },
-    drawMinorStationNames: function(fontSize) {
-        for (var i in this.stationsMinor) {
-            var station = this.stationsMinor[i];
-            var stationLineDirection = station.direction();
-            var xOffset = 0;
-            var position = station.direction()*station.style.minorStationSize*1.2;
-            var text = this.createText(station, position);
-            text.fontSize = fontSize;
-            if (stationLineDirection.x < 0) {
-                xOffset = -text.bounds.width;
-                text.position += new Point(xOffset, 0);
-            }
-            if (stationLineDirection.y > 0.01) {
-                yOffset = text.bounds.height/1.5;
-                text.position += new Point(0, yOffset);
-            }
-        }
-    },
-    findStationByPathId: function(id) {
-        for (var i in this.stations) {
-            var stationId = this.stations[i].path.id;
-            if (stationId === id) {
-                return this.stations[i];
-            }
-        }
-        return null;
-    },
-    findStation: function(id) {
-        for (var i in this.stations) {
-            if (this.stations[i].id === id) {
-                return this.stations[i];
-            }
-        }
-        return null;
-    },
-    removeStation: function(id) {
-        console.log('track.removeStation() on track:', this.id);
-        function removeFromTrackState(track, id) {
-            var station = track.findStation(id);
-            if (station) {
-                console.log('track.removeStation()', station);
-                var pos = track.stations.indexOf(station);
-                if (pos > -1) {
-                    station.notifyBeforeRemove();
-                    track.stations.splice(pos, 1);
-                }
-                pos = track.stationsMajor.indexOf(station);
-                if (pos > -1) {
-                    station.notifyBeforeRemove();
-                    track.stationsMajor.splice(pos, 1);
-                }
-                pos = track.stationsMinor.indexOf(station);
-                if (pos > -1) {
-                    station.notifyBeforeRemove();
-                    track.stationsMinor.splice(pos, 1);
-                }
-            }
-        }
-        removeFromTrackState(this, id);
-        for (var i = this.segments.length - 1; i >= 0; i--) {  // loop backwards because we splice the array
-            var segment = this.segments[i];
-            if (segment.stationA.id === id || segment.stationB.id === id) {
-                var pos = this.segments.indexOf(segment);
-                if (pos > -1) {
-                    var stationsRemoved = segment.removeAllOnSegmentStations();
-                    for (var j in stationsRemoved) {
-                        removeFromTrackState(this, stationsRemoved[j].id);
-                    }
-                    this.segments.splice(pos, 1);
-                }
-            } else {
-                segment.removeStation(id);
-            }
-        }
-        return ;
-    },
-    findSegmentByPathId: function(id) {
-        for (var i in this.segments) {
-            if (this.segments[i].path.id === id) {
-                return this.segments[i];
-            }
-        }
-        return null;
-    },
-    findSegment: function(id) {
-        for (var i in this.segments) {
-            if (this.segments[i].id === id) {
-                return this.segments[i];
-            }
-        }
-        return null;
-    },
-    findSegmentBetweenStations: function(stationA, stationB) {
-        for (var i in this.segments) {
-            if (stationA.id === this.segments[i].stationA.id
-                && stationB.id === this.segments[i].stationB.id) {
-                return this.segments[i];
-            }
-        }
-        return null;
-    },
-    findSegmentForStationMinor: function(stationMinor) {
-        return this.findSegmentBetweenStations(stationMinor.stationA, stationMinor.stationB);
-    },
-    findSegmentsForStation: function(station) {
-        var segments = [];
-        for (var i in this.segments) {
-            var index = this.segments[i].stations.indexOf(station);
-            if (index != -1) {
-                segments.push(this.segments[i]);
-            }
-        }
-        return segments;
+  setStationRadius(radius) {
+    this.stationStyle.stationRadius = radius;
+  }
+
+  setStationStrokeWidth(strokeWidth) {
+    this.stationStyle.strokeWidth = strokeWidth;
+  }
+
+  setSegmentStyle(style) {
+    this.segmentStyle = style;
+    this.stationMinorStyle.strokeWidth = this.segmentStyle.strokeWidth;
+    this.stationMinorStyle.strokeColor = this.segmentStyle.strokeColor;
+    this.stationMinorStyle.minorStationSize =
+      this.segmentStyle.strokeWidth * 2.0;
+  }
+
+  setStationStyle(style) {
+    this.stationStyle = style;
+  }
+
+  createStationFree(position, previousStation) {
+    const station = new Station(position, this.stationStyle);
+    if (previousStation) {
+      const segment = this.createSegment(previousStation, station);
+      segment.draw();
     }
-};
+    this.stations.push(station);
+    this.stationsMajor.push(station);
+    station.draw();
+    console.log("create station", station.id);
+    this.notifyObservers();
+    return station;
+  }
 
+  createStationOnSegment(segment, offsetFactor) {
+    // Ensure segment is drawn first
+    if (!segment.path) {
+      segment.draw();
+    }
+    const point = segment.path.getPointAt(segment.path.length * offsetFactor);
+    const station = new Station(point, this.stationStyle);
+    this.stations.push(station);
+    this.stationsMajor.push(station);
+    segment.addStation(station);
+    this.notifyObservers();
+    return station;
+  }
 
-function createTrack() {
-    var observable = Object.create(util.Observable).Observable();
-    var track = Object.assign(observable, Track);
-    track = track.Track();
-    return track;
+  createSegment(stationA, stationB) {
+    console.log("track.createSegment", stationA.id, stationB.id);
+    const segment = new Segment(stationA, stationB, this.segmentStyle);
+    this.segments.push(segment);
+    this.notifyObservers();
+    return segment;
+  }
+
+  createStationMinor(position, segment) {
+    const nearestPoint = segment.path.getNearestPoint(position);
+    const station = new StationMinor(
+      nearestPoint,
+      segment.stationA,
+      segment.stationB,
+      this.stationMinorStyle
+    );
+    segment.addStation(station);
+    this.stations.push(station);
+    this.stationsMinor.push(station);
+    this.notifyObservers();
+    return station;
+  }
+
+  draw(drawSettings = {}) {
+    // Draw segments
+    this.segments.forEach((segment) => {
+      const previous = this.segmentToStation(segment.stationA);
+      segment.draw(previous, drawSettings);
+    });
+
+    // Draw minor stations
+    this.stationsMinor.forEach((station) => {
+      const segment = this.findSegmentForStation(station);
+      station.draw(segment);
+    });
+
+    // Draw major stations
+    this.stationsMajor.forEach((station) => station.draw());
+
+    // Draw station names if enabled
+    if (drawSettings.text) {
+      this.drawStationNames(drawSettings);
+    }
+  }
+
+  drawStationNames(drawSettings) {
+    const paths = this.segments.map((segment) => segment.path);
+
+    // Draw major station names
+    this.stationsMajor.forEach((station) => {
+      const text = new paper.PointText({
+        point: station.position.add(
+          new paper.Point(
+            station.style.stationRadius + station.style.strokeWidth,
+            drawSettings.fontSize / 4
+          )
+        ),
+        content: station.name,
+        fontSize: drawSettings.fontSize || 14,
+        fillColor: "black",
+      });
+
+      if (drawSettings.calcTextPositions) {
+        this.optimizeTextPosition(text, station, paths);
+      }
+    });
+
+    // Draw minor station names if enabled
+    if (drawSettings.minorStationText) {
+      this.stationsMinor.forEach((station) => {
+        const direction = station.direction();
+        const text = new paper.PointText({
+          point: station.position.add(
+            direction.multiply(station.style.minorStationSize * 1.2)
+          ),
+          content: station.name,
+          fontSize: drawSettings.minorFontSize || 10,
+          fillColor: "black",
+        });
+
+        this.adjustMinorStationText(text, direction);
+      });
+    }
+  }
+
+  optimizeTextPosition(text, station, paths) {
+    const positions = this.calculateTextPositions(text, station);
+    let bestPosition = positions[0];
+    let minIntersections = Number.MAX_VALUE;
+
+    positions.forEach((position) => {
+      text.position = station.position.add(position);
+      const intersections = paths.filter((path) =>
+        text.intersects(path)
+      ).length;
+      if (intersections < minIntersections) {
+        minIntersections = intersections;
+        bestPosition = position;
+      }
+    });
+
+    text.position = station.position.add(bestPosition);
+    station.textPositionRel = bestPosition;
+  }
+
+  calculateTextPositions(text, station) {
+    const r = station.style.stationRadius + station.style.strokeWidth;
+    const w = text.bounds.width;
+    const h = text.bounds.height;
+
+    return [
+      new paper.Point(r, h / 4),
+      new paper.Point(-r - w, h / 4),
+      new paper.Point(0, -r * 1.2),
+      new paper.Point(r, -r * 0.8),
+      new paper.Point(-w, -r * 1.2),
+      new paper.Point(-w - r, -r * 0.8),
+      new paper.Point(0, r * 2.2),
+      new paper.Point(r, r * 1.4),
+      new paper.Point(-w, r * 2.2),
+      new paper.Point(-w - r, r * 1.2),
+    ];
+  }
+
+  adjustMinorStationText(text, direction) {
+    // Rotate text to match the direction of the minor station line
+    const angle = Math.atan2(direction.y, direction.x);
+    text.rotate((angle * 180) / Math.PI);
+
+    // Adjust text position based on its rotation
+    const textWidth = text.bounds.width;
+    const textHeight = text.bounds.height;
+    const offset = direction.multiply(textWidth / 2);
+    text.position = text.position.add(offset);
+
+    // Ensure text is always readable from left to right
+    if (angle > Math.PI / 2 || angle < -Math.PI / 2) {
+      text.rotate(180);
+    }
+  }
+
+  // Helper methods
+  segmentToStation(station) {
+    return this.segments.find((segment) => segment.stationB.id === station.id);
+  }
+
+  segmentFromStation(station) {
+    return this.segments.find((segment) => segment.stationA.id === station.id);
+  }
+
+  connectedStations(station) {
+    const stations = [];
+    this.segments.forEach((segment) => {
+      if (segment.stationA === station) {
+        stations.push(segment.stationB);
+      } else if (segment.stationB === station) {
+        stations.push(segment.stationA);
+      }
+    });
+    return stations;
+  }
+
+  lastAddedStation() {
+    return this.stationsMajor[this.stationsMajor.length - 1];
+  }
+
+  findSegmentForStation(station) {
+    return this.segments.find((segment) =>
+      segment.stations.some((s) => s.id === station.id)
+    );
+  }
+
+  findStation(id) {
+    return this.stations.find((station) => station.id === id);
+  }
+
+  findStationByPathId(pathId) {
+    return this.stations.find(
+      (station) => station.path && station.path.id === pathId
+    );
+  }
+
+  findSegment(id) {
+    return this.segments.find((segment) => segment.id === id);
+  }
+
+  findSegmentByPathId(pathId) {
+    return this.segments.find(
+      (segment) => segment.path && segment.path.id === pathId
+    );
+  }
+
+  findSegmentsForStation(station) {
+    return this.segments.filter((segment) =>
+      segment.stations.some((s) => s.id === station.id)
+    );
+  }
+
+  notifyObservers() {
+    // Implement observer pattern if needed
+  }
+
+  allPaths() {
+    const paths = [];
+    // Add segment paths
+    this.segments.forEach((segment) => {
+      if (segment.path) {
+        paths.push(segment.path);
+      }
+    });
+    // Add station paths
+    this.stations.forEach((station) => {
+      if (station.path) {
+        paths.push(station.path);
+      }
+    });
+    return paths;
+  }
 }
 
-
-module.exports = {
-    createTrack: createTrack,
-};
+export function createTrack() {
+  const track = new Track();
+  Object.assign(track, new Observable());
+  return track;
+}

@@ -1,183 +1,174 @@
-require("paper");
-util = require("./util.js");
-styles = require("./styles.js");
+import paper from "paper";
+import { v4 as uuidv4 } from "uuid";
+import { Observable } from "./util";
+import { Styles } from "./styles";
 
+export class Station extends Observable {
+  constructor(position, style) {
+    super();
+    console.log("new station for point", position);
+    this.position = position;
+    this.offsetFactor = null;
+    this.style = style || Styles.createStationStyle();
+    this.id = uuidv4().substring(0, 8);
+    this.path = null;
+    this.isSelected = false;
+    this.name = "station";
+    this.textPositionRel = null;
+    this.doSnap = true;
+  }
 
-var Station = {
-    Station: function(position, style) {
-        console.log('new station for point', position);
-        this.position = position;
-        this.offsetFactor = null;
-        this.style = style;
-        this.id = util.uuidv4().substring(0, 8);
-        this.path = null;
-        this.isSelected = false;
-        this.name = "station";
-        this.textPositionRel = null;
-        this.doSnap = true;
-        return this;
-    },
-    toggleSelect: function() {
-        if (this.isSelected) {
-            this.deselect();
-        } else {
-            this.select();
-        }
-    },
-    select: function() {
-        this.isSelected = true;
-    },
-    deselect: function() {
-        this.isSelected = false;
-    },
-    setPosition: function(position, segment) {
-        this.doSetPosition(position, segment);
-        this.textPositionRel = null;
+  toggleSelect() {
+    this.isSelected ? this.deselect() : this.select();
+  }
+
+  select() {
+    this.isSelected = true;
+  }
+
+  deselect() {
+    this.isSelected = false;
+  }
+
+  setPosition(position, segment) {
+    this.doSetPosition(position, segment);
+    this.textPositionRel = null;
+    this.notifyAllObservers();
+  }
+
+  draw() {
+    if (this.path) {
+      this.path.remove();
+    }
+
+    this.path = new paper.Path.Circle({
+      center: this.position,
+      radius: this.style.stationRadius,
+      strokeColor: this.isSelected
+        ? this.style.selectionColor
+        : this.style.strokeColor,
+      strokeWidth: this.style.strokeWidth,
+      fillColor: this.style.fillColor,
+    });
+
+    this.path.bringToFront();
+  }
+
+  updatePosition(segment, notifyObservers = true) {
+    // For regular stations, just use the current position
+    this.doSetPosition(this.position, segment);
+    if (notifyObservers) {
+      this.notifyAllObservers();
+    }
+  }
+
+  doSetPosition(position, segment) {
+    this.position = position;
+  }
+}
+
+export class StationMinor extends Station {
+  constructor(position, stationA, stationB, style) {
+    super(position, style || Styles.createStationMinorStyle());
+    this.stationA = stationA;
+    this.stationB = stationB;
+    this.name = "minor station";
+    this.doSnap = false;
+    this.normalUnit = null;
+  }
+
+  draw(segment) {
+    if (this.path) {
+      this.path.remove();
+    }
+
+    const minorStationSize = this.style.minorStationSize;
+    this.path = new paper.Path({
+      segments: [
+        this.position,
+        this.position.add(this.normalUnit.multiply(minorStationSize)),
+      ],
+      strokeColor: this.style.strokeColor,
+      strokeWidth: this.style.strokeWidth,
+    });
+  }
+
+  direction() {
+    return this.path.lastSegment.point
+      .subtract(this.path.firstSegment.point)
+      .normalize();
+  }
+
+  doSetPosition(position, segment) {
+    this.position = position;
+  }
+
+  updatePosition(segment, notifyObservers = true) {
+    const offsetFactor = segment.getOffsetOf(this.position) / segment.length();
+    const offset = segment.path.length * offsetFactor;
+    this.position = segment.path.getPointAt(offset);
+
+    const previousStationInfo = segment.getPreviousStation(this.position);
+    const nextStationInfo = segment.getNextStation(this.position);
+    const stationsAuto = segment.getStationsBetween(
+      previousStationInfo.station,
+      nextStationInfo.station
+    );
+
+    const offsetA = previousStationInfo.offset;
+    const offsetB = nextStationInfo.offset;
+    const totalLength = offsetB - offsetA;
+    const distanceBetweenStations = totalLength / (stationsAuto.length + 1);
+    const orderNr = stationsAuto.indexOf(this);
+    const stationOffset = distanceBetweenStations * (orderNr + 1) + offsetA;
+
+    const position = segment.path.getPointAt(stationOffset);
+    if (position) {
+      this.position = position;
+      this.offsetFactor = segment.getOffsetOf(position) / segment.length();
+      this.normalUnit = segment.path.getNormalAt(stationOffset);
+
+      if (notifyObservers) {
         this.notifyAllObservers();
-    },
-};
-
-
-var StationPainter = {
-    draw: function() {
-        this.path = new Path.Circle(this.position, this.style.stationRadius);
-        if (this.isSelected) {
-            this.path.strokeColor = this.style.selectionColor;
-        } else {
-            this.path.strokeColor = this.style.strokeColor;
-        }
-        this.path.strokeWidth = this.style.strokeWidth;
-        this.path.fillColor = this.style.fillColor;
-        this.path.bringToFront();
-    },
-};
-
-
-var StationMinorPainter = {
-    draw: function(segment) {
-        var minorStationSize = this.style.minorStationSize;
-        this.path = new Path.Line(this.position, this.position + this.normalUnit*minorStationSize);
-        this.path.strokeColor = this.style.strokeColor;
-        this.path.strokeWidth = this.style.strokeWidth;
-        // this.path.fillColor = this.style.fillColor;
-    },
-    direction: function() {
-        return (this.path.lastSegment.point - this.path.firstSegment.point).normalize();
+      }
     }
-};
 
-
-var StationPositionSegmentAuto = {
-    doSetPosition: function(position, segment) {
-        this.position = position;
-    },
-    updatePosition: function(segment, notifyObservers) {
-        // console.log('=======================================');
-        // console.log('StationPositionSegmentAuto.updatePosition');
-        // console.log('this.position', this.position);
-        // console.log('segment', segment);
-        var offsetFactor = segment.getOffsetOf(this.position) / segment.length();
-        var offset = segment.path.length * offsetFactor;
-        this.position = segment.path.getPointAt(offset);
-        var previousStationInfo = segment.getPreviousStation(this.position);
-        // console.log('previousStationInfo', previousStationInfo.station.id);
-        var offsetA = previousStationInfo.offset;
-        var nextStationInfo = segment.getNextStation(this.position);
-        var stationsAuto = segment.getStationsBetween(previousStationInfo.station, nextStationInfo.station);
-        var nStations = stationsAuto.length;
-        var offsetB = nextStationInfo.offset;
-        // console.log('nextStationInfo', nextStationInfo.station.id);
-        var totalLength = offsetB - offsetA;
-        // console.log('totalLength', totalLength);
-        // console.log('segment.length', segment.length());
-        var distanceBetweenStations = totalLength/(nStations+1);
-        var orderNr = stationsAuto.indexOf(this);
-        var stationOffset = distanceBetweenStations * (orderNr+1) + offsetA;
-        // console.log('stationsAuto', stationsAuto);
-        // console.log('orderNr', orderNr);
-        // console.log('stationOffset', stationOffset);
-        var position = segment.path.getPointAt(stationOffset);
-        console.assert(position);
-        if (position) {
-            this.position = position;
-        }
-        this.offsetFactor = segment.getOffsetOf(position) / segment.length();
-        // console.log('segment.getOffsetOf(this.position)', segment.getOffsetOf(this.position));
-        // console.log('offsetFactor', this.offsetFactor);
-        this.normalUnit = segment.path.getNormalAt(stationOffset);
-        if (notifyObservers) {
-            this.notifyAllObservers();
-        }
-        return this.position;
-    }
-};
-
-
-var StationPositionSegmentUser = {
-    doSetPosition: function(position, segment) {
-        this.offsetFactor = segment.getOffsetOf(position) / segment.length();
-    },
-    updatePosition: function(segment, notifyObservers) {
-        var distanceStation = segment.path.length * this.offsetFactor;
-        this.position = segment.path.getPointAt(distanceStation);
-        if (notifyObservers) {
-            this.notifyAllObservers();
-        }
-        return this.position;
-    }
-};
-
-
-var StationPositionFree = {
-    doSetPosition: function(position, segment) {
-        this.position = position;
-    },
-    updatePosition: function(segment, notifyObservers) {
-        if (notifyObservers) {
-            this.notifyAllObservers();
-        }
-        return this.position;
-    }
-};
-
-
-function createStationFree(position, style) {
-    var observable = Object.create(util.Observable).Observable();
-    var station = Object.assign(observable, Station, StationPositionFree, StationPainter);
-    if (!style) {
-        style = styles.createStationStyle();
-    }
-    station = station.Station(position, style);
-    return station;
+    return this.position;
+  }
 }
 
+export class StationSegment extends Station {
+  constructor(offsetFactor, style) {
+    super(new paper.Point(0, 0), style);
+    this.offsetFactor = offsetFactor;
+    this.doSnap = false;
+  }
 
-function createStationSegment(offsetFactor, style) {
-    console.log('createStationMinor');
-    var observable = Object.create(util.Observable).Observable();
-    var station = Object.assign(observable, Station, StationPositionSegmentUser, StationPainter);
-    station = station.Station(new Point(0, 0), style);
-    station.offsetFactor = offsetFactor;
-    station.doSnap = false;
-    return station;
+  doSetPosition(position, segment) {
+    this.offsetFactor = segment.getOffsetOf(position) / segment.length();
+  }
+
+  updatePosition(segment, notifyObservers = true) {
+    const distanceStation = segment.path.length * this.offsetFactor;
+    this.position = segment.path.getPointAt(distanceStation);
+
+    if (notifyObservers) {
+      this.notifyAllObservers();
+    }
+
+    return this.position;
+  }
 }
 
-
-function createStationMinor(position, stationA, stationB, style) {
-    console.log('createStationMinor');
-    var observable = Object.create(util.Observable).Observable();
-    var station = Object.assign(observable, Station, StationPositionSegmentAuto, StationMinorPainter);
-    station = station.Station(position, style);
-    station.stationA = stationA;
-    station.stationB = stationB;
-    station.name = "minor station";
-    station.doSnap = false;
-    return station;
+// Factory functions
+export function createStation(position, style) {
+  return new Station(position, style);
 }
 
+export function createStationSegment(offsetFactor, style) {
+  return new StationSegment(offsetFactor, style);
+}
 
-module.exports = {
-    createStationFree: createStationFree,
-    createStationSegment: createStationSegment,
-    createStationMinor: createStationMinor,
-};
+export function createStationMinor(position, stationA, stationB, style) {
+  return new StationMinor(position, stationA, stationB, style);
+}

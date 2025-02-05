@@ -1,0 +1,21 @@
+{
+  "name": "metroflow",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "jquery": "^3.7.1",
+    "jquery-contextmenu": "^2.9.2",
+    "jquery-ui": "^1.14.1",
+    "paper": "^0.12.17",
+    "uuid": "^11.0.5"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}

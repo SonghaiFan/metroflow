@@ -1,0 +1,32 @@
+/* MetroFlow Main Styles */
+:root {
+  --primary-color: #2196f3;
+  --secondary-color: #f50057;
+  --background-color: #ffffff;
+  --text-color: #333333;
+  --border-color: #cccccc;
+}
+
+.metroflow-station {
+  cursor: pointer;
+  transition: fill 0.2s ease;
+}
+
+.metroflow-station:hover {
+  fill: var(--primary-color);
+}
+
+.metroflow-segment {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.metroflow-connection {
+  stroke-dasharray: 5, 5;
+}
+
+.metroflow-text {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 12px;
+  user-select: none;
+}
