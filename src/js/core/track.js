@@ -1,9 +1,9 @@
 import paper from "paper";
 import { v4 as uuidv4 } from "uuid";
-import { Observable } from "./util";
+import { Observable } from "../utils/util";
 import { Segment } from "./segment";
 import { Station, StationMinor } from "./station";
-import { Styles } from "./styles";
+import { Styles } from "../utils/styles";
 
 export class Track {
   constructor() {
@@ -283,6 +283,66 @@ export class Track {
       }
     });
     return paths;
+  }
+
+  handleStationCreation(point, snapEnabled = true) {
+    // Try to create station on existing segment first
+    const hitResult = paper.project.hitTest(point, {
+      segments: true,
+      stroke: true,
+      fill: true,
+      tolerance: 5,
+    });
+
+    let station;
+    if (hitResult && hitResult.item) {
+      const segment = this.findSegmentByPathId(hitResult.item.id);
+      if (segment) {
+        const offsetFactor = segment.getOffsetOf(point) / segment.length();
+        station = this.createStationOnSegment(segment, offsetFactor);
+        station.doSnap = false; // Disable snapping for segment-bound stations
+      }
+    }
+
+    if (!station) {
+      // Create free station if no segment hit
+      station = this.createStationFree(point);
+      station.doSnap = snapEnabled;
+    }
+
+    return station;
+  }
+
+  handleMinorStationCreation(point, segment) {
+    if (!segment) return null;
+
+    const station = this.createStationMinor(point, segment);
+    station.doSnap = false;
+    station.name = "minor station";
+
+    // Auto-position the station along the segment
+    const previousStation = segment.getPreviousStation(point);
+    const nextStation = segment.getNextStation(point);
+    const stationsAuto = segment.getStationsBetween(
+      previousStation.station,
+      nextStation.station
+    );
+    const totalLength = nextStation.offset - previousStation.offset;
+    const distanceBetweenStations = totalLength / (stationsAuto.length + 1);
+    const orderNr = stationsAuto.indexOf(station);
+    const stationOffset =
+      distanceBetweenStations * (orderNr + 1) + previousStation.offset;
+
+    const position = segment.path.getPointAt(stationOffset);
+    if (position) {
+      station.setPosition(position);
+    }
+
+    return station;
+  }
+
+  deselectAllStations() {
+    this.stations.forEach((station) => station.deselect());
   }
 }
 

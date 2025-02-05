@@ -1,5 +1,9 @@
 import paper from "paper";
-import { createMap } from "./map";
+import { createMap } from "../core/map";
+import { createTrack } from "../core/track";
+import { createSegment } from "../core/segment";
+import { createStation, createStationMinor } from "../core/station";
+import { createConnection } from "../core/connection";
 
 export function saveMap(map) {
   const mapData = {

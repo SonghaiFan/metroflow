@@ -1,22 +1,22 @@
 import paper from "paper";
 
 // Import modules
-import { DisplaySettings, Observer } from "./util";
-import { createMap, createDrawSettings, DrawSettings } from "./map";
-import { createTrack } from "./track";
-import { createSegment } from "./segment";
+import { DisplaySettings, Observer } from "./utils/util";
+import { createMap, createDrawSettings, DrawSettings } from "./core/map";
+import { createTrack } from "./core/track";
+import { createSegment } from "./core/segment";
 import {
   createStation,
   createStationMinor,
   createStationSegment,
-} from "./station";
-import { createConnection } from "./connection";
-import * as styles from "./styles";
-import * as snap from "./snap";
-import * as serialize from "./serialize";
-import * as revision from "./revision";
-import * as zoom from "./controls/zoom";
-import * as interaction from "./interaction";
+} from "./core/station";
+import { createConnection } from "./core/connection";
+import * as styles from "./utils/styles";
+import * as snap from "./utils/snap";
+import * as serialize from "./utils/serialize";
+import * as revision from "./utils/revision";
+import * as zoom from "./utils/zoom";
+import * as interaction from "./editor/interaction";
 
 // Export modules
 export { DisplaySettings, Observer };
@@ -56,5 +56,6 @@ export function initialize(canvas) {
     segment: createSegment,
     station: createStation,
     connection: createConnection(),
+    snap: snap,
   };
 }

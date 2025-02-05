@@ -1,5 +1,5 @@
 import paper from "paper";
-import { Observable } from "./util";
+import { Observable } from "../utils/util";
 import { createTrack } from "./track";
 import { createConnection } from "./connection";
 

@@ -1,5 +1,5 @@
 import paper from "paper";
-import { Segment } from "./segment";
+import { Segment } from "../core/segment";
 
 export class SnapManager {
   static MIN_SNAP_DISTANCE = Segment.minStraight + Segment.arcRadius * 2.0;

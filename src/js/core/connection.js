@@ -1,7 +1,7 @@
 import paper from "paper";
 import { v4 as uuidv4 } from "uuid";
-import { Observable } from "./util";
-import { StyleUtils } from "./styles";
+import { Observable } from "../utils/util";
+import { StyleUtils } from "../utils/styles";
 
 export class Connection extends Observable {
   constructor(stationA, stationB) {

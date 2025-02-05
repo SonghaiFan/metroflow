@@ -1,5 +1,5 @@
 import paper from "paper";
-import { DisplaySettings, Observer } from "./util";
+import { DisplaySettings, Observer } from "../utils/util";
 
 let currentMap = null;
 

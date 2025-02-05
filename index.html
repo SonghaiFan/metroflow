@@ -4,148 +4,319 @@
     <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>MetroFlow Editor</title>
+    <title>MetroFlow</title>
+    <link rel="stylesheet" href="/src/css/metroflows.css" />
+    <link rel="stylesheet" href="/src/css/ui.css" />
   </head>
   <body>
     <div id="toolbar">
-      <div class="toolbar-buttons">
-        <input
-          id="button-select"
-          type="image"
-          src="/src/data/images/icon_select.svg"
-          width="32px"
-        />
-        <input
-          id="button-major-station"
-          type="image"
-          src="/src/data/images/icon_major_station.svg"
-          width="32px"
-        />
-        <input
-          id="button-minor-station"
-          type="image"
-          src="/src/data/images/icon_minor_station.svg"
-          width="32px"
-        />
-        <input
-          id="button-new-connection"
-          type="image"
-          src="/src/data/images/button_new_connection.png"
-          width="32px"
-        />
-        <button id="button-new-track" type="button">new track</button>
-        <button id="button-undo" type="button">undo</button>
-        <button id="button-redo" type="button">redo</button>
-        <button id="button-calc-text-positions" type="button">
-          position text
+      <!-- Drawing Tools -->
+      <div class="tool-group">
+        <button id="button-select" class="btn active" title="Select Tool (S)">
+          <svg viewBox="0 0 24 24" width="18" height="18">
+            <path
+              fill="currentColor"
+              d="M7 2l12 11-5.5 1.5 3.5 5.5-2.5 1.5-3.5-5.5L7 20z"
+            />
+          </svg>
+          <span>Select</span>
         </button>
-        snap: <input type="checkbox" id="checkbox-snap" checked />
-        <button id="button-save-map" type="button">save map</button>
-        <label>load map: </label><input type="file" id="file-input" />
+        <button id="button-new-track" class="btn" title="New Track Tool (T)">
+          <svg viewBox="0 0 24 24" width="18" height="18">
+            <path d="M3 17h18v2H3v-2zm0-6h18v2H3v-2z" />
+          </svg>
+          <span>Track</span>
+        </button>
+        <button
+          id="button-major-station"
+          class="btn"
+          title="Major Station Tool (M)"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18">
+            <circle
+              cx="12"
+              cy="12"
+              r="8"
+              stroke="currentColor"
+              stroke-width="2"
+              fill="none"
+            />
+            <circle cx="12" cy="12" r="3" fill="currentColor" />
+          </svg>
+          <span>Major</span>
+        </button>
+        <button
+          id="button-minor-station"
+          class="btn"
+          title="Minor Station Tool (N)"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18">
+            <circle
+              cx="12"
+              cy="12"
+              r="5"
+              stroke="currentColor"
+              stroke-width="2"
+              fill="none"
+            />
+          </svg>
+          <span>Minor</span>
+        </button>
       </div>
+
+      <!-- Connection Tools -->
+      <div class="tool-group">
+        <button id="button-new-connection" class="btn" title="New Connection">
+          <svg viewBox="0 0 24 24" width="18" height="18">
+            <path
+              d="M8 8 C 8 8, 12 8, 16 8"
+              stroke="currentColor"
+              stroke-width="2"
+              fill="none"
+            />
+            <path
+              d="M8 16 C 8 16, 12 16, 16 16"
+              stroke="currentColor"
+              stroke-width="2"
+              fill="none"
+            />
+            <circle cx="6" cy="8" r="2" fill="currentColor" />
+            <circle cx="18" cy="8" r="2" fill="currentColor" />
+            <circle cx="6" cy="16" r="2" fill="currentColor" />
+            <circle cx="18" cy="16" r="2" fill="currentColor" />
+          </svg>
+          <span>Connect</span>
+        </button>
+        <button id="button-snap" class="btn active" title="Toggle Snap (G)">
+          <svg viewBox="0 0 24 24" width="18" height="18">
+            <path
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+              d="M6 6h12v12H6z"
+            />
+            <circle cx="6" cy="6" r="2" fill="currentColor" />
+            <circle cx="12" cy="6" r="2" fill="currentColor" />
+            <circle cx="18" cy="6" r="2" fill="currentColor" />
+            <circle cx="6" cy="12" r="2" fill="currentColor" />
+            <circle cx="12" cy="12" r="2" fill="currentColor" />
+            <circle cx="18" cy="12" r="2" fill="currentColor" />
+            <circle cx="6" cy="18" r="2" fill="currentColor" />
+            <circle cx="12" cy="18" r="2" fill="currentColor" />
+            <circle cx="18" cy="18" r="2" fill="currentColor" />
+          </svg>
+          <span>Snap</span>
+        </button>
+      </div>
+
+      <!-- Map Tools -->
+      <div class="tool-group">
+        <button
+          id="button-calc-text-positions"
+          class="btn"
+          title="Recalculate Text Positions"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18">
+            <path d="M4 19h6v-2H4v2zM20 5H4v2h16V5zm-3 6H4v2h13v-2z" />
+          </svg>
+          <span>Text</span>
+        </button>
+        <button id="button-save-map" class="btn" title="Save Map">
+          <svg viewBox="0 0 24 24" width="18" height="18">
+            <path
+              d="M17 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V7l-4-4zm2 16H5V5h11.17L19 7.83V19zm-7-7c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"
+            />
+          </svg>
+          <span>Save</span>
+        </button>
+      </div>
+
+      <!-- History Tools -->
+      <div class="tool-group">
+        <button id="button-undo" class="btn btn-icon" title="Undo">
+          <svg viewBox="0 0 24 24" width="18" height="18">
+            <path
+              d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"
+            />
+          </svg>
+        </button>
+        <button id="button-redo" class="btn btn-icon" title="Redo">
+          <svg viewBox="0 0 24 24" width="18" height="18">
+            <path
+              d="M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z"
+            />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Zoom Tools -->
+      <div class="tool-group">
+        <button
+          id="button-zoom-in"
+          class="btn btn-icon"
+          title="Zoom In (Ctrl/Cmd +)"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18">
+            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+          </svg>
+        </button>
+        <button
+          id="button-zoom-out"
+          class="btn btn-icon"
+          title="Zoom Out (Ctrl/Cmd -)"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18">
+            <path d="M19 13H5v-2h14v2z" />
+          </svg>
+        </button>
+        <button
+          id="button-zoom-reset"
+          class="btn btn-icon"
+          title="Reset Zoom (Ctrl/Cmd 0)"
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18">
+            <path
+              d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"
+            />
+          </svg>
+        </button>
+      </div>
+
+      <input type="file" id="file-input" style="display: none" />
     </div>
 
-    <canvas id="paperCanvas" resize></canvas>
-    <div id="overlay"></div>
-    <div id="overlay-content"></div>
+    <canvas id="paperCanvas"></canvas>
 
     <div id="sidebar">
-      <div class="toolbar-buttons">
-        <button
-          id="button-example-map1"
-          type="button"
-          data-filename="example1.json"
-        >
-          Example map 1
-        </button>
-        <br />
-        <button
-          id="button-example-map2"
-          type="button"
-          data-filename="example2.json"
-        >
-          Example map 2
-        </button>
-      </div>
+      <div id="style-controls">
+        <div class="control-group">
+          <h3>Map Style</h3>
+          <div class="example-maps">
+            <button
+              id="button-example-map1"
+              class="btn btn-secondary"
+              data-filename="example1.json"
+            >
+              Example 1
+            </button>
+            <button
+              id="button-example-map2"
+              class="btn btn-secondary"
+              data-filename="example2.json"
+            >
+              Example 2
+            </button>
+          </div>
 
-      <hr />
-      <div class="map-style-widget">
-        <h4>Map Style</h4>
-        <input type="checkbox" id="checkbox-minor-station-names" checked />
-        minor names
-        <br />
-        <input type="checkbox" id="checkbox-debug" /> debug
-        <br />
-        <label>Station name size: </label>
-        <input
-          id="station-name-size-slider"
-          type="range"
-          min="8"
-          max="24"
-          value="14"
-          class="slider"
-        />
-      </div>
-
-      <hr />
-
-      <div class="station-style-widget">
-        <h4>Track Style</h4>
-        <div class="track-style-widget">
-          <label>Track color: </label
-          ><input id="track-color-picker" type="color" value="#ff0000" />
-          <br />
-          <label>Track width: </label>
-          <input
-            id="track-width-slider"
-            type="range"
-            min="1"
-            max="10"
-            value="4"
-            class="slider"
-          />
-          <label>Station radius: </label>
-          <input
-            id="station-radius-slider"
-            type="range"
-            min="1"
-            max="20"
-            value="8"
-            class="slider"
-          />
-          <label>Station stroke color: </label
-          ><input
-            id="station-stroke-color-picker"
-            type="color"
-            value="#ff0000"
-          />
-          <br />
-          <label>Station stroke width: </label>
-          <input
-            id="station-stroke-width-slider"
-            type="range"
-            min="0"
-            max="5"
-            value="2"
-            class="slider"
-          />
+          <div class="checkbox-group">
+            <div>
+              <input
+                type="checkbox"
+                id="checkbox-station-names"
+                class="toggle-input"
+                checked
+              />
+              <label for="checkbox-station-names" class="toggle-label">
+                Show Station Names
+              </label>
+            </div>
+            <div>
+              <input
+                type="checkbox"
+                id="checkbox-minor-station-names"
+                class="toggle-input"
+              />
+              <label for="checkbox-minor-station-names" class="toggle-label">
+                Show Minor Station Names
+              </label>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <hr />
+        <div class="control-group">
+          <h3>Track Style</h3>
+          <div class="control-item">
+            <label for="track-color-picker">Track Color</label>
+            <div class="color-picker-wrapper">
+              <input type="color" id="track-color-picker" value="#2196f3" />
+            </div>
+          </div>
+          <div class="control-item">
+            <label for="track-width-slider">
+              Track Width
+              <span class="value-display">4px</span>
+            </label>
+            <input
+              type="range"
+              id="track-width-slider"
+              class="slider"
+              min="1"
+              max="20"
+              value="4"
+            />
+          </div>
+        </div>
 
-      <div class="track-table-container">
-        <h4>Track Table</h4>
-        <table id="track-table">
-          <thead>
-            <th>station name</th>
-          </thead>
-          <tbody>
-            <tr>
-              <td><input type="text" value="station-name" /></td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="control-group">
+          <h3>Station Style</h3>
+          <div class="control-item">
+            <label for="station-radius-slider">
+              Station Radius
+              <span class="value-display">8px</span>
+            </label>
+            <input
+              type="range"
+              id="station-radius-slider"
+              class="slider"
+              min="2"
+              max="20"
+              value="8"
+            />
+          </div>
+          <div class="control-item">
+            <label for="station-stroke-width-slider">
+              Stroke Width
+              <span class="value-display">2px</span>
+            </label>
+            <input
+              type="range"
+              id="station-stroke-width-slider"
+              class="slider"
+              min="1"
+              max="10"
+              value="2"
+            />
+          </div>
+          <div class="control-item">
+            <label for="station-stroke-color-picker">Stroke Color</label>
+            <div class="color-picker-wrapper">
+              <input
+                type="color"
+                id="station-stroke-color-picker"
+                value="#ffffff"
+              />
+            </div>
+          </div>
+          <div class="control-item">
+            <label for="station-name-size-slider">
+              Name Size
+              <span class="value-display">12px</span>
+            </label>
+            <input
+              type="range"
+              id="station-name-size-slider"
+              class="slider"
+              min="8"
+              max="24"
+              value="12"
+            />
+          </div>
+        </div>
+
+        <div class="control-group">
+          <h3>Stations</h3>
+          <div id="station-list"></div>
+        </div>
       </div>
     </div>
 

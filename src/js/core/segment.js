@@ -1,7 +1,6 @@
 import paper from "paper";
 import { v4 as uuidv4 } from "uuid";
-import { Observable } from "./util";
-import { DisplaySettings } from "./util";
+import { Observable, DisplaySettings } from "../utils/util";
 
 export class Segment extends Observable {
   static arcRadius = 8.0;
