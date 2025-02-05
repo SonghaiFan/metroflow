@@ -222,26 +222,41 @@ function initializeSidebar(app) {
 
   // Initialize range inputs
   $("#track-width-slider").on("input", (e) => {
-    const value = e.target.value;
-    console.log("Track width changed:", value);
+    const value = parseInt(e.target.value);
+    app.map.tracks.forEach((track) => {
+      track.segmentStyle.strokeWidth = value;
+      // Update minor station size since it depends on track width
+      track.stationMinorStyle.strokeWidth = value;
+      track.stationMinorStyle.minorStationSize = value * 2.0;
+    });
+    app.map.draw(drawSettings);
     paper.view.update();
   });
 
   $("#station-radius-slider").on("input", (e) => {
-    const value = e.target.value;
-    console.log("Station radius changed:", value);
+    const value = parseInt(e.target.value);
+    app.map.tracks.forEach((track) => {
+      track.stationStyle.stationRadius = value;
+    });
+    app.map.draw(drawSettings);
     paper.view.update();
   });
 
   $("#station-stroke-width-slider").on("input", (e) => {
-    const value = e.target.value;
-    console.log("Station stroke width changed:", value);
+    const value = parseInt(e.target.value);
+    app.map.tracks.forEach((track) => {
+      track.stationStyle.strokeWidth = value;
+    });
+    app.map.draw(drawSettings);
     paper.view.update();
   });
 
   $("#station-stroke-color-picker").on("change", (e) => {
-    // Handle station stroke color change
-    console.log("Station stroke color changed:", e.target.value);
+    const value = e.target.value;
+    app.map.tracks.forEach((track) => {
+      track.stationStyle.strokeColor = value;
+    });
+    app.map.draw(drawSettings);
     paper.view.update();
   });
 
