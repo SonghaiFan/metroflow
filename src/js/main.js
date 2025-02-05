@@ -121,8 +121,10 @@ function initializeToolbar(app) {
   });
 
   $("#button-calc-text-positions").on("click", () => {
-    // Handle text positioning
-    console.log("Calculate text positions clicked");
+    drawSettings.calcTextPositions = true;
+    app.map.draw(drawSettings);
+    drawSettings.calcTextPositions = false;
+    console.log("Text positions recalculated");
   });
 
   $("#checkbox-snap").on("change", (e) => {
@@ -240,6 +242,15 @@ function initializeSidebar(app) {
   $("#station-stroke-color-picker").on("change", (e) => {
     // Handle station stroke color change
     console.log("Station stroke color changed:", e.target.value);
+    paper.view.update();
+  });
+
+  // Add station name size control
+  $("#station-name-size-slider").on("input", (e) => {
+    const value = parseInt(e.target.value);
+    drawSettings.fontSize = value;
+    drawSettings.minorFontSize = Math.max(8, value - 4); // Minor text slightly smaller
+    app.map.draw(drawSettings);
     paper.view.update();
   });
 }
@@ -393,31 +404,54 @@ function handleSelectToolClick(event, app) {
 function handleStationCreation(event, app) {
   if (!currentTrack) return;
 
-  // Convert event point to project coordinates
-  let point = paper.view.viewToProject(new paper.Point(event.point));
+  const hitResult = paper.project.hitTest(event.point, {
+    segments: true,
+    stroke: true,
+    fill: true,
+    tolerance: 5,
+  });
 
-  // Create the station
-  const station = currentTrack.createStationFree(point, lastStation);
-  lastStation = station;
-  selectedStation = station;
-  station.select();
+  if (hitResult) {
+    const path = hitResult.item;
+    const { segment } = app.map.findSegmentByPathId(path.id);
 
-  // Apply snapping if enabled
-  if (snapEnabled) {
-    const snappedPosition = metroflow.snap.SnapManager.snapPosition(
-      currentTrack,
-      station,
-      point
-    );
-    station.setPosition(snappedPosition);
+    if (segment) {
+      // Create station on segment
+      const offsetFactor = segment.getOffsetOf(event.point) / segment.length();
+      const station = currentTrack.createStationOnSegment(
+        segment,
+        offsetFactor
+      );
+      station.doSnap = false; // Disable snapping for segment-bound stations
+      lastStation = station;
+      selectedStation = station;
+      station.select();
+    }
+  } else {
+    // Create free station
+    let point = paper.view.viewToProject(new paper.Point(event.point));
+    const station = currentTrack.createStationFree(point, lastStation);
+    station.doSnap = snapEnabled;
+    lastStation = station;
+    selectedStation = station;
+    station.select();
+
+    // Apply snapping if enabled
+    if (snapEnabled) {
+      const snappedPosition = metroflow.snap.SnapManager.snapPosition(
+        currentTrack,
+        station,
+        point
+      );
+      station.setPosition(snappedPosition);
+    }
   }
 
-  // Draw the entire map to ensure proper rendering
+  // Draw the entire map
   app.map.draw(drawSettings);
 
   // Create revision after station creation
   revision.createRevision(app.map);
-
   paper.view.update();
 }
 
@@ -432,10 +466,30 @@ function handleMinorStationCreation(event, app) {
     const { segment, track } = app.map.findSegmentByPathId(path.id);
     if (segment) {
       const station = track.createStationMinor(event.point, segment);
-      station.name = "minor station"; // Set default name for minor stations
-      // Create revision after minor station creation
+      station.doSnap = false;
+      station.name = "minor station";
+
+      // Auto-position the station along the segment
+      const previousStation = segment.getPreviousStation(event.point);
+      const nextStation = segment.getNextStation(event.point);
+      const stationsAuto = segment.getStationsBetween(
+        previousStation.station,
+        nextStation.station
+      );
+      const totalLength = nextStation.offset - previousStation.offset;
+      const distanceBetweenStations = totalLength / (stationsAuto.length + 1);
+      const orderNr = stationsAuto.indexOf(station);
+      const stationOffset =
+        distanceBetweenStations * (orderNr + 1) + previousStation.offset;
+
+      const position = segment.path.getPointAt(stationOffset);
+      if (position) {
+        station.setPosition(position);
+      }
+
+      // Create revision and draw
       revision.createRevision(app.map);
-      app.map.draw(drawSettings); // Use full draw settings to show labels
+      app.map.draw(drawSettings);
       paper.view.update();
     }
   }
@@ -447,8 +501,8 @@ function handleDragInSelectMode(event, app) {
   dragging = true;
   let point = event.point;
 
-  // Apply snapping if enabled
-  if (snapEnabled) {
+  // Apply snapping if enabled for this station
+  if (selectedStation.doSnap && snapEnabled) {
     const track = app.map.tracks.find((t) =>
       t.stations.includes(selectedStation)
     );
@@ -461,8 +515,10 @@ function handleDragInSelectMode(event, app) {
     }
   }
 
-  selectedStation.position = point;
-  // Use fast drawing during drag but still show labels
+  selectedStation.setPosition(point);
+  selectedStation.textPositionRel = null; // Reset text position when station is moved
+
+  // Use fast drawing during drag
   app.map.draw({ ...drawSettings, fast: true });
   paper.view.update();
 }
@@ -473,5 +529,119 @@ function handleMouseUpInSelectMode(event, app) {
     // Create revision after drag ends
     revision.createRevision(app.map);
     app.map.draw(drawSettings); // Full redraw with labels after drag
+    paper.view.update();
+  }
+}
+
+// Add text positioning functions
+function calculateTextPositions(text, station) {
+  const r = station.style.stationRadius + station.style.strokeWidth;
+  const w = text.bounds.width;
+  const h = text.bounds.height;
+  const padding = 4; // Add padding between station and text
+
+  // Calculate more positions with different offsets and angles
+  return [
+    // Right side positions
+    new paper.Point(r + padding, 0), // Right center
+    new paper.Point(r + padding, -h / 2), // Right top
+    new paper.Point(r + padding, h / 2), // Right bottom
+
+    // Left side positions
+    new paper.Point(-r - w - padding, 0), // Left center
+    new paper.Point(-r - w - padding, -h / 2), // Left top
+    new paper.Point(-r - w - padding, h / 2), // Left bottom
+
+    // Top positions
+    new paper.Point(-w / 2, -r - h - padding), // Top center
+    new paper.Point(0, -r - h - padding), // Top center-right
+    new paper.Point(-w, -r - h - padding), // Top center-left
+
+    // Bottom positions
+    new paper.Point(-w / 2, r + padding), // Bottom center
+    new paper.Point(0, r + padding), // Bottom center-right
+    new paper.Point(-w, r + padding), // Bottom center-left
+
+    // Diagonal positions
+    new paper.Point(r * 0.7 + padding, -r * 0.7 - h), // Top right diagonal
+    new paper.Point(-r * 0.7 - w - padding, -r * 0.7 - h), // Top left diagonal
+    new paper.Point(r * 0.7 + padding, r * 0.7), // Bottom right diagonal
+    new paper.Point(-r * 0.7 - w - padding, r * 0.7), // Bottom left diagonal
+  ];
+}
+
+function optimizeTextPosition(text, station, paths) {
+  const positions = calculateTextPositions(text, station);
+  let bestPosition = positions[0];
+  let minScore = Number.MAX_VALUE;
+
+  // Get connected segments for this station
+  const connectedPaths = paths.filter((path) => {
+    const start = path.firstSegment.point;
+    const end = path.lastSegment.point;
+    const stationPos = station.position;
+    const threshold = station.style.stationRadius * 2;
+    return (
+      start.getDistance(stationPos) < threshold ||
+      end.getDistance(stationPos) < threshold
+    );
+  });
+
+  positions.forEach((position) => {
+    text.position = station.position.add(position);
+
+    // Calculate score based on multiple factors
+    let score = 0;
+
+    // Factor 1: Path intersections (highest weight)
+    const intersections = paths.filter((path) => text.intersects(path)).length;
+    score += intersections * 1000;
+
+    // Factor 2: Distance from connected paths (medium weight)
+    connectedPaths.forEach((path) => {
+      const nearestPoint = path.getNearestPoint(text.position);
+      const distance = text.position.getDistance(nearestPoint);
+      score += Math.max(0, 50 - distance) * 10;
+    });
+
+    // Factor 3: Prefer positions based on connected paths direction
+    connectedPaths.forEach((path) => {
+      const tangent = path.getTangentAt(0);
+      const textVector = position.normalize();
+      const alignment = Math.abs(tangent.dot(textVector));
+      score += alignment * 5;
+    });
+
+    // Factor 4: Distance from station (small weight)
+    const distanceFromStation = position.length;
+    score += distanceFromStation * 0.1;
+
+    // Factor 5: Prefer right side slightly (smallest weight)
+    if (position.x < 0) score += 1;
+
+    if (score < minScore) {
+      minScore = score;
+      bestPosition = position;
+    }
+  });
+
+  // Apply the best position
+  text.position = station.position.add(bestPosition);
+  station.textPositionRel = bestPosition;
+}
+
+function adjustMinorStationText(text, direction) {
+  // Rotate text to match the direction of the minor station line
+  const angle = Math.atan2(direction.y, direction.x);
+  text.rotate((angle * 180) / Math.PI);
+
+  // Adjust text position based on its rotation
+  const textWidth = text.bounds.width;
+  const offset = direction.multiply(textWidth / 2);
+  text.position = text.position.add(offset);
+
+  // Ensure text is always readable from left to right
+  if (angle > Math.PI / 2 || angle < -Math.PI / 2) {
+    text.rotate(180);
   }
 }

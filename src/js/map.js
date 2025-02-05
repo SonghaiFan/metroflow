@@ -65,14 +65,18 @@ export class Map extends Observable {
     console.time("map.draw");
     paper.project.clear();
 
+    // Clear any existing text items first
+    paper.project.activeLayer.children.forEach((child) => {
+      if (child instanceof paper.PointText) {
+        child.remove();
+      }
+    });
+
     this.tracks.forEach((track) => track.draw(drawSettings));
     this.connections.forEach((connection) => connection.draw());
 
     if (drawSettings.text) {
       const paths = !drawSettings.fast ? this.allPaths() : [];
-      if (!drawSettings.fast) {
-        console.log("map.draw() paths.length", paths.length);
-      }
       this.drawStationNames(paths, drawSettings);
     }
     console.timeEnd("map.draw");
@@ -83,7 +87,9 @@ export class Map extends Observable {
   }
 
   drawStationNames(paths, drawSettings) {
-    this.tracks.forEach((track) => track.drawStationNames(paths, drawSettings));
+    this.tracks.forEach((track) => {
+      track.drawStationNames(paths, drawSettings);
+    });
   }
 
   allPaths() {
