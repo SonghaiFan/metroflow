@@ -60,17 +60,3 @@ export function setLoadMapAction(callback) {
     .getElementById("file-input")
     .addEventListener("change", callback, false);
 }
-
-module.exports = {
-  setMajorStationButtonAction: setMajorStationButtonAction,
-  setMinorStationButtonAction: setMinorStationButtonAction,
-  setSelectButtonAction: setSelectButtonAction,
-  setNewTrackButtonAction: setNewTrackButtonAction,
-  setNewConnectionAction: setNewConnectionAction,
-  setUndoAction: setUndoAction,
-  setRedoAction: setRedoAction,
-  setToggleSnapAction: setToggleSnapAction,
-  setCalcTextPositionsAction: setCalcTextPositionsAction,
-  setSaveMapAction: setSaveMapAction,
-  setLoadMapAction: setLoadMapAction,
-};

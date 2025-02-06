@@ -1,6 +1,7 @@
 import paper from "paper";
 import { zoomUtils } from "../utils/zoom";
 import { createRevision } from "../utils/revision";
+import { setLastStation } from "./ui";
 
 export function handleSelectToolClick(
   event,
@@ -41,7 +42,6 @@ export function handleStationCreation(
     snapEnabled,
     lastStation,
     selectedStation,
-    setLastStation,
     setSelectedStation,
     drawSettings,
   }
@@ -61,6 +61,11 @@ export function handleStationCreation(
         point
       );
       station.setPosition(snappedPosition);
+    }
+
+    // Create segment between last station and new station
+    if (lastStation) {
+      currentTrack.createSegment(lastStation, station);
     }
 
     setLastStation(station);

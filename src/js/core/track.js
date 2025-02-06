@@ -4,6 +4,7 @@ import { Observable } from "../utils/util";
 import { Segment } from "./segment";
 import { Station, StationMinor } from "./station";
 import { Styles } from "../utils/styles";
+import { optimizeTextPosition, adjustMinorStationText } from "../utils/text";
 
 export class Track {
   constructor() {
@@ -74,6 +75,12 @@ export class Track {
     return segment;
   }
 
+  createStationMinorOnSegmentId(position, segmentId) {
+    const segment = this.findSegment(segmentId);
+    position = segment.path.getNearestPoint(position);
+    return this.createStationMinor(position, segment);
+  }
+
   createStationMinor(position, segment) {
     const nearestPoint = segment.path.getNearestPoint(position);
     const station = new StationMinor(
@@ -87,6 +94,14 @@ export class Track {
     this.stationsMinor.push(station);
     this.notifyObservers();
     return station;
+  }
+
+  segmentToStation(station) {
+    return this.segments.find((s) => s.stationB.id === station.id) || null;
+  }
+
+  segmentFromStation(station) {
+    return this.segments.find((s) => s.stationA.id === station.id) || null;
   }
 
   draw(drawSettings = {}) {
@@ -116,104 +131,101 @@ export class Track {
 
     // Draw major station names
     this.stationsMajor.forEach((station) => {
+      // Remove existing text if any
+      if (station.textElement) {
+        station.textElement.remove();
+      }
+
       const text = new paper.PointText({
         point: station.position.add(
-          new paper.Point(
-            station.style.stationRadius + station.style.strokeWidth,
-            drawSettings.fontSize / 4
-          )
+          station.textPositionRel ||
+            new paper.Point(
+              station.style.stationRadius + station.style.strokeWidth,
+              drawSettings.fontSize / 4
+            )
         ),
         content: station.name,
         fontSize: drawSettings.fontSize || 14,
         fillColor: "black",
       });
 
-      if (drawSettings.calcTextPositions) {
-        this.optimizeTextPosition(text, station, paths);
+      // Store reference to text element
+      station.textElement = text;
+
+      // Only calculate position if no custom position exists and calcTextPositions is true
+      if (!station.textPositionRel && drawSettings.calcTextPositions) {
+        optimizeTextPosition(text, station, paths);
       }
+
+      // Make text draggable
+      text.onMouseDrag = function (event) {
+        this.position = event.point;
+        // Store relative position from station
+        station.textPositionRel = event.point.subtract(station.position);
+      };
+
+      // Visual feedback on hover
+      text.onMouseEnter = function () {
+        document.body.style.cursor = "move";
+        this.fillColor = "#FFD700";
+      };
+
+      text.onMouseLeave = function () {
+        document.body.style.cursor = "default";
+        this.fillColor = "black";
+      };
     });
 
     // Draw minor station names if enabled
     if (drawSettings.minorStationText) {
       this.stationsMinor.forEach((station) => {
+        // Remove existing text if any
+        if (station.textElement) {
+          station.textElement.remove();
+        }
+
         const direction = station.direction();
         const text = new paper.PointText({
           point: station.position.add(
-            direction.multiply(station.style.minorStationSize * 1.2)
+            station.textPositionRel ||
+              direction.multiply(station.style.minorStationSize * 1.2)
           ),
           content: station.name,
           fontSize: drawSettings.minorFontSize || 10,
           fillColor: "black",
         });
 
-        this.adjustMinorStationText(text, direction);
+        // Store reference to text element
+        station.textElement = text;
+
+        // Only adjust if no custom position exists
+        if (!station.textPositionRel) {
+          adjustMinorStationText(text, direction);
+        }
+
+        // Make text draggable
+        text.onMouseDrag = function (event) {
+          this.position = event.point;
+          // Store relative position from station
+          station.textPositionRel = event.point.subtract(station.position);
+        };
+
+        // Visual feedback on hover
+        text.onMouseEnter = function () {
+          document.body.style.cursor = "move";
+          this.fillColor = "#007bff";
+        };
+
+        text.onMouseLeave = function () {
+          document.body.style.cursor = "default";
+          this.fillColor = "black";
+        };
       });
     }
   }
 
-  optimizeTextPosition(text, station, paths) {
-    const positions = this.calculateTextPositions(text, station);
-    let bestPosition = positions[0];
-    let minIntersections = Number.MAX_VALUE;
-
-    positions.forEach((position) => {
-      text.position = station.position.add(position);
-      const intersections = paths.filter((path) =>
-        text.intersects(path)
-      ).length;
-      if (intersections < minIntersections) {
-        minIntersections = intersections;
-        bestPosition = position;
-      }
-    });
-
-    text.position = station.position.add(bestPosition);
-    station.textPositionRel = bestPosition;
-  }
-
-  calculateTextPositions(text, station) {
-    const r = station.style.stationRadius + station.style.strokeWidth;
-    const w = text.bounds.width;
-    const h = text.bounds.height;
-
-    return [
-      new paper.Point(r, h / 4),
-      new paper.Point(-r - w, h / 4),
-      new paper.Point(0, -r * 1.2),
-      new paper.Point(r, -r * 0.8),
-      new paper.Point(-w, -r * 1.2),
-      new paper.Point(-w - r, -r * 0.8),
-      new paper.Point(0, r * 2.2),
-      new paper.Point(r, r * 1.4),
-      new paper.Point(-w, r * 2.2),
-      new paper.Point(-w - r, r * 1.2),
-    ];
-  }
-
-  adjustMinorStationText(text, direction) {
-    // Rotate text to match the direction of the minor station line
-    const angle = Math.atan2(direction.y, direction.x);
-    text.rotate((angle * 180) / Math.PI);
-
-    // Adjust text position based on its rotation
-    const textWidth = text.bounds.width;
-    const textHeight = text.bounds.height;
-    const offset = direction.multiply(textWidth / 2);
-    text.position = text.position.add(offset);
-
-    // Ensure text is always readable from left to right
-    if (angle > Math.PI / 2 || angle < -Math.PI / 2) {
-      text.rotate(180);
-    }
-  }
-
-  // Helper methods
-  segmentToStation(station) {
-    return this.segments.find((segment) => segment.stationB.id === station.id);
-  }
-
-  segmentFromStation(station) {
-    return this.segments.find((segment) => segment.stationA.id === station.id);
+  lastAddedStation() {
+    return this.stationsMajor[this.stationsMajor.length - 1] || null;
   }
 
   connectedStations(station) {
@@ -228,8 +240,12 @@ export class Track {
     return stations;
   }
 
-  lastAddedStation() {
-    return this.stationsMajor[this.stationsMajor.length - 1];
+  allPaths() {
+    const paths = [];
+    for (const i in this.segments) {
+      paths.push(this.segments[i].path);
+    }
+    return paths;
   }
 
   findSegmentForStation(station) {
@@ -266,23 +282,6 @@ export class Track {
 
   notifyObservers() {
     // Implement observer pattern if needed
-  }
-
-  allPaths() {
-    const paths = [];
-    // Add segment paths
-    this.segments.forEach((segment) => {
-      if (segment.path) {
-        paths.push(segment.path);
-      }
-    });
-    // Add station paths
-    this.stations.forEach((station) => {
-      if (station.path) {
-        paths.push(station.path);
-      }
-    });
-    return paths;
   }
 
   handleStationCreation(point, snapEnabled = true) {

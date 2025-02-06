@@ -15,6 +15,7 @@ export class Station extends Observable {
     this.isSelected = false;
     this.name = "station";
     this.textPositionRel = null;
+    this.textElement = null;
     this.doSnap = true;
   }
 

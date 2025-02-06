@@ -20,6 +20,7 @@ import {
   setDrawSettings,
   getCurrentTrack,
   getLastStation,
+  setLastStation,
 } from "./editor/ui";
 import {
   handleSelectToolClick,
@@ -104,7 +105,7 @@ $(document).ready(async () => {
           snapEnabled: isSnapEnabled(),
           lastStation: getLastStation(),
           selectedStation,
-          setLastStation: (s) => (lastStation = s),
+          setLastStation,
           setSelectedStation: (s) => (selectedStation = s),
           drawSettings,
         });
